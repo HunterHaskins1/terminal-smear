@@ -30,10 +30,11 @@ jobs:
       - name: Restore NuGet packages
         shell: pwsh
         run: |
-          Write-Host "=== Reverting NuGet config for CI ==="
-          # The terminal repo has packages restored via git restored packages dir
-          # or via nuget restore. Try MSBuild restore targets.
-          nuget restore $env:SOLUTION -NonInteractive -Verbosity detailed 2>&1 | Select-String -Pattern "error|restored|not found|missing"
+          Write-Host "=== Restoring NuGet packages ==="
+          # The default feed requires Azure DevOps auth - add nuget.org as fallback
+          dotnet nuget add source https://api.nuget.org/v3/index.json --name nugetorg --configfile NuGet.Config 2>$null
+          nuget restore $env:SOLUTION -NonInteractive -Verbosity normal -Source "https://api.nuget.org/v3/index.json"
+          Write-Host "=== NuGet restore exit code: $LASTEXITCODE ==="
 
       - name: Build
         shell: pwsh
