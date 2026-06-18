@@ -16,19 +16,22 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Setup VS 2026
+      - name: Setup VS workloads
         shell: pwsh
         run: |
-          $vsInstaller = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
           $vsWhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsInstaller = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
 
-          # Check if VS 2026 already installed on runner
-          $installed = & $vsWhere -products * -format json | ConvertFrom-Json | Where-Object { $_.catalog_productLineVersion -eq 18 }
-          if (-not $installed) {
-            Write-Host "Installing VS 2026 Community..."
-            $p = Start-Process -PassThru -FilePath $vsInstaller -ArgumentList @(
-              "install", "--productId", "Microsoft.VisualStudio.Product.Community",
-              "--channelId", "VisualStudio.18.Release",
+          # Find the installed VS instance
+          $instance = & $vsWhere -products * -format json | ConvertFrom-Json | Select-Object -First 1
+          if (-not $instance) {
+              throw "No VS installation found"
+          }
+          Write-Host "Found: $($instance.displayName) at $($instance.installationPath)"
+
+          # Ensure required workloads are installed
+          $p = Start-Process -PassThru -FilePath $vsInstaller -ArgumentList @(
+              "modify", "--installPath", $instance.installationPath,
               "--add", "Microsoft.VisualStudio.Workload.NativeDesktop",
               "--add", "Microsoft.VisualStudio.Workload.Universal",
               "--add", "Microsoft.VisualStudio.Workload.ManagedDesktop",
@@ -37,13 +40,11 @@ jobs:
               "--add", "Microsoft.VisualStudio.ComponentGroup.WindowsAppDevelopment.Prerequisites",
               "--includeRecommended",
               "--quiet", "--norestart", "--wait"
-            )
-            $p.WaitForExit()
-            if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) {
-              throw "VS install failed with exit code $($p.ExitCode)"
-            }
-          } else {
-            Write-Host "VS 2026 already installed."
+          )
+          $p.WaitForExit()
+          Write-Host "VS modify exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010 -and $p.ExitCode -ne 5007) {
+              throw "VS modify failed with exit code $($p.ExitCode)"
           }
 
       - name: Build
@@ -55,7 +56,7 @@ jobs:
             throw "MSBuild not found"
           }
           Write-Host "MSBuild: $msbuild"
-          & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /p:AppxPackage=false /m
+          & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /m
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
