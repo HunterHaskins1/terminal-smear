@@ -41,22 +41,23 @@ jobs:
           # Create stub for private ThemeHelpers NuGet package
           $themeHelpersPath = "packages\Microsoft.Internal.Windows.Terminal.ThemeHelpers.0.8.250811004\build\native"
           New-Item -ItemType Directory -Force -Path $themeHelpersPath | Out-Null
-          @"
+
+          $header = @'
           #pragma once
           #include <windows.h>
           inline void TerminalTrySetTransparentBackground(bool) noexcept {}
           inline void TerminalTrySetAutoCompleteAnimationsWhenOccluded(IUnknown*, bool) noexcept {}
           inline HRESULT TerminalTrySetWindowAssociatedProcesses(HWND, DWORD, HANDLE*) noexcept { return S_FALSE; }
-          "@ | Set-Content "$themeHelpersPath\TerminalThemeHelpers.h" -Encoding Ascii
+          '@
+          Set-Content "$themeHelpersPath\TerminalThemeHelpers.h" $header -Encoding Ascii
 
-          @"
-          <?xml version="1.0" encoding="utf-8"?>
+          $targets = '<?xml version="1.0" encoding="utf-8"?>
           <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
             <ItemGroup>
               <AdditionalIncludeDirectories Include="$(MSBuildThisFileDirectory)" />
             </ItemGroup>
-          </Project>
-          "@ | Set-Content "$themeHelpersPath\Microsoft.Internal.Windows.Terminal.ThemeHelpers.targets" -Encoding Ascii
+          </Project>'
+          Set-Content "$themeHelpersPath\Microsoft.Internal.Windows.Terminal.ThemeHelpers.targets" $targets -Encoding Ascii
 
           Write-Host "ThemeHelpers stub created at $themeHelpersPath"
 
