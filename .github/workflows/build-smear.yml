@@ -35,25 +35,51 @@ jobs:
           .\dep\nuget\nuget.exe install .\dep\nuget\packages.config -OutputDirectory .\packages -Source "https://api.nuget.org/v3/index.json" -NonInteractive
           Write-Host "=== Bundled restore exit code: $LASTEXITCODE ==="
 
-      - name: Build (continue on test failures)
+      - name: Setup stub packages
+        shell: pwsh
+        run: |
+          # Create stub for private ThemeHelpers NuGet package
+          $themeHelpersPath = "packages\Microsoft.Internal.Windows.Terminal.ThemeHelpers.0.8.250811004\build\native"
+          New-Item -ItemType Directory -Force -Path $themeHelpersPath | Out-Null
+          @"
+          #pragma once
+          #include <windows.h>
+          inline void TerminalTrySetTransparentBackground(bool) noexcept {}
+          inline void TerminalTrySetAutoCompleteAnimationsWhenOccluded(IUnknown*, bool) noexcept {}
+          inline HRESULT TerminalTrySetWindowAssociatedProcesses(HWND, DWORD, HANDLE*) noexcept { return S_FALSE; }
+          "@ | Set-Content "$themeHelpersPath\TerminalThemeHelpers.h" -Encoding Ascii
+
+          @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+            <ItemGroup>
+              <AdditionalIncludeDirectories Include="$(MSBuildThisFileDirectory)" />
+            </ItemGroup>
+          </Project>
+          "@ | Set-Content "$themeHelpersPath\Microsoft.Internal.Windows.Terminal.ThemeHelpers.targets" -Encoding Ascii
+
+          Write-Host "ThemeHelpers stub created at $themeHelpersPath"
+
+      - name: Restore NuGet packages
+        shell: pwsh
+        run: |
+          .\dep\nuget\nuget.exe install .\dep\nuget\packages.config -OutputDirectory .\packages -Source "https://api.nuget.org/v3/index.json" -NonInteractive
+
+      - name: Build
         shell: pwsh
         run: |
           $vsWhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
           $msbuild = & $vsWhere -products * -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
           if (-not $msbuild) { throw "MSBuild not found" }
-          .\dep\nuget\nuget.exe install .\dep\nuget\packages.config -OutputDirectory .\packages -Source "https://api.nuget.org/v3/index.json" -NonInteractive
-          # Build with ContinueOnError so test projects (missing Taef) don't block the main build
-          & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /m /p:ContinueOnError=WarnAndContinue
-          Write-Host "Build completed. Checking for AtlasEngine compilation..."
+          & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /m
 
       - name: Upload Build Artifacts
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Terminal-Smear-Build
           path: |
             bin\x64\Release\**
-          if-no-files-found: warn
+          if-no-files-found: error
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
