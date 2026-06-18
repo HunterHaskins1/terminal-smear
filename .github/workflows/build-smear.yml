@@ -27,6 +27,12 @@ jobs:
           Write-Host "Found: $($instance.displayName) at $($instance.installationPath)"
           Write-Host "Product line version: $($instance.catalog_productLineVersion)"
 
+      - name: Restore NuGet packages
+        shell: pwsh
+        run: |
+          nuget restore $env:SOLUTION
+          dotnet restore $env:SOLUTION
+
       - name: Build
         shell: pwsh
         run: |
@@ -36,7 +42,6 @@ jobs:
             throw "MSBuild not found"
           }
           Write-Host "MSBuild: $msbuild"
-          # Check for a .vsconfig alongside the solution to auto-install missing components
           & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /m /p:AppxPackage=false
 
       - name: Upload Build Artifacts
