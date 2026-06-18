@@ -38,11 +38,8 @@ jobs:
         run: |
           $vsWhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
           $msbuild = & $vsWhere -products * -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
-          if (-not $msbuild) {
-            throw "MSBuild not found"
-          }
-          Write-Host "MSBuild: $msbuild"
-          & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /m /p:AppxPackage=false
+          if (-not $msbuild) { throw "MSBuild not found" }
+          & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /m
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
