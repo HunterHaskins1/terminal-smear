@@ -35,24 +35,15 @@ jobs:
           .\dep\nuget\nuget.exe install .\dep\nuget\packages.config -OutputDirectory .\packages -Source "https://api.nuget.org/v3/index.json" -NonInteractive
           Write-Host "=== Bundled restore exit code: $LASTEXITCODE ==="
 
-      - name: Build AtlasEngine
+      - name: Build
         shell: pwsh
         run: |
           $vsWhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
           $msbuild = & $vsWhere -products * -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
           if (-not $msbuild) { throw "MSBuild not found" }
-          # Restore with nuget.org fallback first
-          nuget restore src\renderer\atlas\atlas.vcxproj -Source https://api.nuget.org/v3/index.json
-          & $msbuild src\renderer\atlas\atlas.vcxproj /p:Configuration=Release /p:Platform=x64
-
-      - name: Build CascadiaPackage
-        shell: pwsh
-        run: |
-          $vsWhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
-          $msbuild = & $vsWhere -products * -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
-          if (-not $msbuild) { throw "MSBuild not found" }
-          nuget restore OpenConsole.slnx -Source https://api.nuget.org/v3/index.json
-          & $msbuild OpenConsole.slnx /p:Configuration=Release /p:Platform=x64 /m
+          # Use bundled nuget.exe restoring from public feed for core packages
+          .\dep\nuget\nuget.exe install .\dep\nuget\packages.config -OutputDirectory .\packages -Source "https://api.nuget.org/v3/index.json" -NonInteractive
+          & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /m
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
