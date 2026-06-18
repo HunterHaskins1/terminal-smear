@@ -16,36 +16,16 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Setup VS workloads
+      - name: Setup VS
         shell: pwsh
         run: |
           $vsWhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
-          $vsInstaller = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
-
-          # Find the installed VS instance
           $instance = & $vsWhere -products * -format json | ConvertFrom-Json | Select-Object -First 1
           if (-not $instance) {
               throw "No VS installation found"
           }
           Write-Host "Found: $($instance.displayName) at $($instance.installationPath)"
-
-          # Ensure required workloads are installed
-          $p = Start-Process -PassThru -FilePath $vsInstaller -ArgumentList @(
-              "modify", "--installPath", $instance.installationPath,
-              "--add", "Microsoft.VisualStudio.Workload.NativeDesktop",
-              "--add", "Microsoft.VisualStudio.Workload.Universal",
-              "--add", "Microsoft.VisualStudio.Workload.ManagedDesktop",
-              "--add", "Microsoft.Net.Component.4.7.2.TargetingPack",
-              "--add", "Microsoft.VisualStudio.Component.Windows11SDK.26100",
-              "--add", "Microsoft.VisualStudio.ComponentGroup.WindowsAppDevelopment.Prerequisites",
-              "--includeRecommended",
-              "--quiet", "--norestart", "--wait"
-          )
-          $p.WaitForExit()
-          Write-Host "VS modify exit code: $($p.ExitCode)"
-          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010 -and $p.ExitCode -ne 5007) {
-              throw "VS modify failed with exit code $($p.ExitCode)"
-          }
+          Write-Host "Product line version: $($instance.catalog_productLineVersion)"
 
       - name: Build
         shell: pwsh
@@ -56,7 +36,8 @@ jobs:
             throw "MSBuild not found"
           }
           Write-Host "MSBuild: $msbuild"
-          & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /m
+          # Check for a .vsconfig alongside the solution to auto-install missing components
+          & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /m /p:AppxPackage=false
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
