@@ -30,8 +30,10 @@ jobs:
       - name: Restore NuGet packages
         shell: pwsh
         run: |
-          nuget restore $env:SOLUTION
-          dotnet restore $env:SOLUTION
+          Write-Host "=== Reverting NuGet config for CI ==="
+          # The terminal repo has packages restored via git restored packages dir
+          # or via nuget restore. Try MSBuild restore targets.
+          nuget restore $env:SOLUTION -NonInteractive -Verbosity detailed 2>&1 | Select-String -Pattern "error|restored|not found|missing"
 
       - name: Build
         shell: pwsh
