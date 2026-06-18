@@ -1,0 +1,66 @@
+name: Build Terminal with Cursor Smear
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      SOLUTION: OpenConsole.slnx
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup VS 2026
+        shell: pwsh
+        run: |
+          $vsInstaller = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+          $vsWhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+
+          # Check if VS 2026 already installed on runner
+          $installed = & $vsWhere -products * -format json | ConvertFrom-Json | Where-Object { $_.catalog_productLineVersion -eq 18 }
+          if (-not $installed) {
+            Write-Host "Installing VS 2026 Community..."
+            $p = Start-Process -PassThru -FilePath $vsInstaller -ArgumentList @(
+              "install", "--productId", "Microsoft.VisualStudio.Product.Community",
+              "--channelId", "VisualStudio.18.Release",
+              "--add", "Microsoft.VisualStudio.Workload.NativeDesktop",
+              "--add", "Microsoft.VisualStudio.Workload.Universal",
+              "--add", "Microsoft.VisualStudio.Workload.ManagedDesktop",
+              "--add", "Microsoft.Net.Component.4.7.2.TargetingPack",
+              "--add", "Microsoft.VisualStudio.Component.Windows11SDK.26100",
+              "--add", "Microsoft.VisualStudio.ComponentGroup.WindowsAppDevelopment.Prerequisites",
+              "--includeRecommended",
+              "--quiet", "--norestart", "--wait"
+            )
+            $p.WaitForExit()
+            if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) {
+              throw "VS install failed with exit code $($p.ExitCode)"
+            }
+          } else {
+            Write-Host "VS 2026 already installed."
+          }
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $vsWhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vsWhere -products * -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
+          if (-not $msbuild) {
+            throw "MSBuild not found"
+          }
+          Write-Host "MSBuild: $msbuild"
+          & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /p:AppxPackage=false /m
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Terminal-Smear-Build
+          path: |
+            bin\x64\Release\**
+          if-no-files-found: error
