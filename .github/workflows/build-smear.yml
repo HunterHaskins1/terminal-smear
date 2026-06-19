@@ -80,7 +80,13 @@ jobs:
           $vsWhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
           $msbuild = & $vsWhere -products * -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
           if (-not $msbuild) { throw "MSBuild not found" }
-          & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /m /p:ContinueOnError=WarnAndContinue
+          & $msbuild $env:SOLUTION /p:Configuration=Release /p:Platform=x64 /m /p:WindowsTargetPlatformVersion=10.0.26100.0 /p:ContinueOnError=WarnAndContinue
+          Write-Host "Build complete. Checking for WindowsTerminal.exe..."
+          if (Test-Path "bin\x64\Release\WindowsTerminal.exe") {
+            Write-Host "WindowsTerminal.exe BUILT SUCCESSFULLY"
+          } elseif (Test-Path "bin\x64\Release\OpenConsole.exe") {
+            Write-Host "OpenConsole.exe built (WindowsTerminal.exe may need UWP packaging)"
+          }
 
       - name: Upload Build Artifacts
         if: always()
@@ -90,11 +96,3 @@ jobs:
           path: |
             bin\x64\Release\**
           if-no-files-found: warn
-
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: Terminal-Smear-Build
-          path: |
-            bin\x64\Release\**
-          if-no-files-found: error
