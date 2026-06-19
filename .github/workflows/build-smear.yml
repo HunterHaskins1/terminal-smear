@@ -42,18 +42,35 @@ jobs:
           $themeHelpersPath = "packages\Microsoft.Internal.Windows.Terminal.ThemeHelpers.0.8.250811004\build\native"
           New-Item -ItemType Directory -Force -Path $themeHelpersPath | Out-Null
 
+          # Create header with proper function declarations (not inline, for DLL export)
           $header = @'
           #pragma once
-          #include <windows.h>
-          inline void TerminalTrySetTransparentBackground(bool) noexcept {}
-          inline void TerminalTrySetAutoCompleteAnimationsWhenOccluded(IUnknown*, bool) noexcept {}
-          inline HRESULT TerminalTrySetWindowAssociatedProcesses(HWND, DWORD, HANDLE*) noexcept { return S_FALSE; }
+          #ifdef __cplusplus
+          extern "C" {
+          #endif
+          void __stdcall TerminalTrySetTransparentBackground(int enabled);
+          void __stdcall TerminalTrySetAutoCompleteAnimationsWhenOccluded(void* root, int enabled);
+          int __stdcall TerminalTrySetWindowAssociatedProcesses(void* hwnd, unsigned long count, void* processes);
+          #ifdef __cplusplus
+          }
+          #endif
           '@
           Set-Content "$themeHelpersPath\TerminalThemeHelpers.h" $header -Encoding Ascii
+
+          # Create implementation file that produces real object code in the static lib
+          $cpp = @'
+          #include <windows.h>
+          #include "TerminalThemeHelpers.h"
+          void __stdcall TerminalTrySetTransparentBackground(int) {}
+          void __stdcall TerminalTrySetAutoCompleteAnimationsWhenOccluded(void*, int) {}
+          int __stdcall TerminalTrySetWindowAssociatedProcesses(void*, unsigned long, void*) { return 1; }
+          '@
+          Set-Content "$themeHelpersPath\TerminalThemeHelpers.cpp" $cpp -Encoding Ascii
 
           $targets = '<?xml version="1.0" encoding="utf-8"?>
           <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
             <ItemGroup>
+              <ClCompile Include="$(MSBuildThisFileDirectory)TerminalThemeHelpers.cpp" />
               <AdditionalIncludeDirectories Include="$(MSBuildThisFileDirectory)" />
             </ItemGroup>
           </Project>'
